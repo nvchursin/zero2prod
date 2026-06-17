@@ -4,3 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+actix-web = "4.13.0"
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+config = "0.15.24"
+reqwest = "0.13.4"
+serde = { version = "1.0.228", features = ["derive"] }
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-rustls", "macros", "postgres", "uuid", "chrono", "migrate"] }
+tokio = { version = "1.52.3", features = ["full"] }
+uuid = { version = "1.23.3", features = ["v4"] }
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "zero2prod"
+path = "src/main.rs"
