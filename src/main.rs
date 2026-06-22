@@ -17,10 +17,14 @@ async fn main() -> std::io::Result<()> {
     init_subscriber(subscriber);
 
     let configuration = get_configuration().expect("Failed to read configuration");
-    let connection = PgPoolOptions::new()
+    let pool = PgPoolOptions::new()
         .acquire_timeout(Duration::from_secs(2))
-        .connect_lazy(&configuration.database.connection_string())
-        .expect("Failed to connect to db");
+        .connect_lazy_with(configuration.database.with_db());
+
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to migrate the database");
 
     let address = format!(
         "{}:{}",
@@ -30,5 +34,5 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(&address)
         .unwrap_or_else(|_| panic!("Failed to bind to address {}", address));
 
-    run(listener, connection)?.await
+    run(listener, pool)?.await
 }

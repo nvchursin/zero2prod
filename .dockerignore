@@ -3,9 +3,8 @@
 .git/
 .vscode/
 newsletter.session.sql
-*,md
+*.md
 target/
 tests/
 Dockerfile
 scripts/
-migrations/
