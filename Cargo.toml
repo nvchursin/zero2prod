@@ -11,6 +11,11 @@ reqwest = "0.13.4"
 serde = { version = "1.0.228", features = ["derive"] }
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-rustls", "macros", "postgres", "uuid", "chrono", "migrate"] }
 tokio = { version = "1.52.3", features = ["full"] }
+tracing = "0.1.44"
+tracing-actix-web = "0.7.22"
+tracing-bunyan-formatter = "0.3.10"
+tracing-log = "0.2.0"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.23.3", features = ["v4"] }
 
 [lib]

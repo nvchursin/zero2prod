@@ -1,11 +1,18 @@
 use std::net::TcpListener;
+use std::sync::LazyLock;
 
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use zero2prod::{
     configurations::{DatabaseSettings, get_configuration},
     startup::run,
+    telemetry::{get_subscriber, init_subscriber},
 };
+
+static TRACING: LazyLock<()> = LazyLock::new(|| {
+    let subscriber = get_subscriber(String::from("test"), String::from("debug"), std::io::sink);
+    init_subscriber(subscriber);
+});
 
 pub struct TestApp {
     pub address: String,
@@ -24,19 +31,21 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Failed to create db");
 
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let db_pool = PgPool::connect(&config.connection_string())
         .await
         .expect("Failed to connect to db");
 
     sqlx::migrate!("./migrations")
-        .run(&connection_pool)
+        .run(&db_pool)
         .await
         .expect("Failed to migrate db");
 
-    connection_pool
+    db_pool
 }
 
 async fn spawn_app() -> TestApp {
+    LazyLock::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let addr = listener.local_addr().expect("Failed to get local_addr");
     let port = addr.port();
@@ -46,16 +55,13 @@ async fn spawn_app() -> TestApp {
     let mut configuration = get_configuration().expect("Failed to read configuration");
     configuration.database.database_name = Uuid::new_v4().to_string();
 
-    let connection_pool = configure_database(&configuration.database).await;
+    let db_pool = configure_database(&configuration.database).await;
 
-    let server = run(listener, connection_pool.clone()).expect("Failed to create server");
+    let server = run(listener, db_pool.clone()).expect("Failed to create server");
 
     tokio::spawn(server);
 
-    TestApp {
-        address,
-        db_pool: connection_pool,
-    }
+    TestApp { address, db_pool }
 }
 
 #[tokio::test]

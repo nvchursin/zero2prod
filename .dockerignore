@@ -1,0 +1,11 @@
+.env
+.gitignore
+.git/
+.vscode/
+newsletter.session.sql
+*,md
+target/
+tests/
+Dockerfile
+scripts/
+migrations/
