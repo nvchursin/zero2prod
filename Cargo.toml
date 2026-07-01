@@ -6,8 +6,10 @@ edition = "2024"
 [dependencies]
 actix-web = "4.13.0"
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+claym = "0.6.0"
 config = "0.15.24"
-reqwest = "0.13.4"
+fake = "5.1.0"
+reqwest = { version = "0.13.4", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_with = "3.21.0"
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-rustls", "macros", "postgres", "uuid", "chrono", "migrate"] }
@@ -17,7 +19,10 @@ tracing-actix-web = "0.7.22"
 tracing-bunyan-formatter = "0.3.10"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+unicode-segmentation = "1.13.3"
 uuid = { version = "1.23.3", features = ["v4"] }
+validator = "0.20.0"
+wiremock = "0.6.5"
 
 [lib]
 path = "src/lib.rs"
@@ -25,3 +30,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "zero2prod"
 path = "src/main.rs"
+
+[dev-dependencies]
+serde_json = "1.0.150"

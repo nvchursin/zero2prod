@@ -1,9 +1,6 @@
-use std::{net::TcpListener, time::Duration};
-
-use sqlx::postgres::PgPoolOptions;
 use zero2prod::{
-    configurations::get_configuration,
-    startup::run,
+    configuration::get_configuration,
+    startup::{Application, get_connection_pool},
     telemetry::{get_subscriber, init_subscriber},
 };
 
@@ -17,22 +14,16 @@ async fn main() -> std::io::Result<()> {
     init_subscriber(subscriber);
 
     let configuration = get_configuration().expect("Failed to read configuration");
-    let pool = PgPoolOptions::new()
-        .acquire_timeout(Duration::from_secs(2))
-        .connect_lazy_with(configuration.database.with_db());
+    let pool = get_connection_pool(&configuration.database);
 
     sqlx::migrate!("./migrations")
         .run(&pool)
         .await
         .expect("Failed to migrate the database");
 
-    let address = format!(
-        "{}:{}",
-        configuration.application.host, configuration.application.port
-    );
+    let application = Application::build(configuration).await?;
 
-    let listener = TcpListener::bind(&address)
-        .unwrap_or_else(|_| panic!("Failed to bind to address {}", address));
+    application.run_until_stopped().await?;
 
-    run(listener, pool)?.await
+    Ok(())
 }

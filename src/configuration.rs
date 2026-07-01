@@ -1,8 +1,12 @@
+use std::time::Duration;
+
 use serde_with::{DisplayFromStr, serde_as};
 use sqlx::{
     ConnectOptions,
     postgres::{PgConnectOptions, PgSslMode},
 };
+
+use crate::domain::SubscriberEmail;
 
 pub enum Environment {
     Local,
@@ -10,7 +14,7 @@ pub enum Environment {
 }
 
 #[serde_as]
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub username: String,
     pub password: String,
@@ -22,17 +26,26 @@ pub struct DatabaseSettings {
 }
 
 #[serde_as]
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
     #[serde_as(as = "DisplayFromStr")]
     pub port: u16,
     pub host: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_email: String,
+    pub authorization_token: String,
+    pub timeout_milliseconds: u64,
+}
+
+#[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub application: ApplicationSettings,
     pub database: DatabaseSettings,
+    pub email_client: EmailClientSettings,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
@@ -102,5 +115,15 @@ impl DatabaseSettings {
         self.without_db()
             .database(&self.database_name)
             .log_statements(tracing::log::LevelFilter::Trace)
+    }
+}
+
+impl EmailClientSettings {
+    pub fn sender(&self) -> Result<SubscriberEmail, String> {
+        SubscriberEmail::parse(self.sender_email.clone())
+    }
+
+    pub fn timeout(&self) -> Duration {
+        Duration::from_millis(self.timeout_milliseconds)
     }
 }
