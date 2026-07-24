@@ -58,8 +58,6 @@ LIMIT 1
     .fetch_optional(transaction.as_mut())
     .await?;
 
-    dbg!(row.iter().clone());
-
     if let Some(row) = row {
         Ok(Some((
             transaction,
