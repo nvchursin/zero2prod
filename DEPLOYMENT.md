@@ -4,9 +4,10 @@ Production временно разворачивается на `151-246-182-63.
 Actions при каждом успешном push в `master`. Registry не используется:
 workflow собирает образ, передаёт его на VPS по SSH и запускает Docker Compose.
 
-Проверки форматирования, Clippy и тесты запускаются при push в любую ветку, а
-также для pull request в `master`. Deploy job запускается только для `master`;
-в pull request production secrets не используются.
+Проверки форматирования, Clippy и тесты запускаются для pull request в
+`master`, а также после push в саму ветку `master`. Это исключает две
+одинаковые проверки одного commit при открытом PR. Deploy job запускается
+только для `master`; в pull request production secrets не используются.
 
 Чтобы GitHub действительно запрещал merge с красными проверками, создайте в
 `Settings -> Rules -> Rulesets` правило для ветки `master`:
