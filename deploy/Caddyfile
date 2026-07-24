@@ -1,0 +1,4 @@
+151-246-182-63.sslip.io {
+	encode zstd gzip
+	reverse_proxy app:8000
+}

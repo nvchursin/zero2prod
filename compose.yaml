@@ -1,0 +1,88 @@
+name: zero2prod
+
+services:
+  app:
+    image: zero2prod:${IMAGE_TAG:?IMAGE_TAG must be set}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ENVIRONMENT: production
+      APP_APPLICATION__BASE_URL: ${APP_APPLICATION__BASE_URL:?APP_APPLICATION__BASE_URL must be set}
+      APP_APPLICATION__HMAC_SECRET: ${APP_APPLICATION__HMAC_SECRET:?APP_APPLICATION__HMAC_SECRET must be set}
+      APP_DATABASE__HOST: postgres
+      APP_DATABASE__PORT: '5432'
+      APP_DATABASE__USERNAME: ${APP_DATABASE__USERNAME:?APP_DATABASE__USERNAME must be set}
+      APP_DATABASE__PASSWORD: ${APP_DATABASE__PASSWORD:?APP_DATABASE__PASSWORD must be set}
+      APP_DATABASE__DATABASE_NAME: ${APP_DATABASE__DATABASE_NAME:?APP_DATABASE__DATABASE_NAME must be set}
+      APP_DATABASE__REQUIRE_SSL: 'false'
+      APP_REDIS_URI: redis://redis:6379
+      APP_EMAIL_CLIENT__AUTHORIZATION_TOKEN: ${APP_EMAIL_CLIENT__AUTHORIZATION_TOKEN:?APP_EMAIL_CLIENT__AUTHORIZATION_TOKEN must be set}
+      APP_EMAIL_CLIENT__SENDER_EMAIL: ${APP_EMAIL_CLIENT__SENDER_EMAIL:?APP_EMAIL_CLIENT__SENDER_EMAIL must be set}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edge
+      - backend
+
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${APP_DATABASE__USERNAME:?APP_DATABASE__USERNAME must be set}
+      POSTGRES_PASSWORD: ${APP_DATABASE__PASSWORD:?APP_DATABASE__PASSWORD must be set}
+      POSTGRES_DB: ${APP_DATABASE__DATABASE_NAME:?APP_DATABASE__DATABASE_NAME must be set}
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - edge
+
+networks:
+  edge:
+  backend:
+    internal: true
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
