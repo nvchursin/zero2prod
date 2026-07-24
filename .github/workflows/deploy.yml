@@ -1,0 +1,182 @@
+name: Check and deploy
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    name: Format, lint, and test
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:password@127.0.0.1:5432/newsletter
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: newsletter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d newsletter"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Apply CI database migrations
+        run: |
+          docker run --rm --network host \
+            --volume "$PWD/migrations:/migrations:ro" \
+            --env PGPASSWORD=password \
+            postgres:17-bookworm \
+            sh -c 'for migration in /migrations/*.sql; do psql --host 127.0.0.1 --username postgres --dbname newsletter --set ON_ERROR_STOP=1 --file "$migration"; done'
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --all-targets --all-features
+
+  deploy:
+    name: Build and deploy
+    needs: checks
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Build production image
+        run: docker build --platform linux/amd64 --tag "zero2prod:${GITHUB_SHA}" .
+
+      - name: Package production image
+        run: docker save "zero2prod:${GITHUB_SHA}" | gzip -1 > zero2prod-image.tar.gz
+
+      - name: Create production environment file
+        env:
+          APP_APPLICATION__BASE_URL: ${{ secrets.APP_APPLICATION__BASE_URL }}
+          APP_APPLICATION__HMAC_SECRET: ${{ secrets.APP_APPLICATION__HMAC_SECRET }}
+          APP_DATABASE__USERNAME: ${{ secrets.APP_DATABASE__USERNAME }}
+          APP_DATABASE__PASSWORD: ${{ secrets.APP_DATABASE__PASSWORD }}
+          APP_DATABASE__DATABASE_NAME: ${{ secrets.APP_DATABASE__DATABASE_NAME }}
+          APP_EMAIL_CLIENT__SENDER_EMAIL: ${{ secrets.APP_EMAIL_CLIENT__SENDER_EMAIL }}
+          APP_EMAIL_CLIENT__AUTHORIZATION_TOKEN: ${{ secrets.APP_EMAIL_CLIENT__AUTHORIZATION_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          values = {
+              "APP_ENVIRONMENT": "production",
+              "APP_APPLICATION__BASE_URL": os.environ["APP_APPLICATION__BASE_URL"],
+              "APP_APPLICATION__HMAC_SECRET": os.environ["APP_APPLICATION__HMAC_SECRET"],
+              "APP_DATABASE__HOST": "postgres",
+              "APP_DATABASE__PORT": "5432",
+              "APP_DATABASE__USERNAME": os.environ["APP_DATABASE__USERNAME"],
+              "APP_DATABASE__PASSWORD": os.environ["APP_DATABASE__PASSWORD"],
+              "APP_DATABASE__DATABASE_NAME": os.environ["APP_DATABASE__DATABASE_NAME"],
+              "APP_DATABASE__REQUIRE_SSL": "false",
+              "APP_REDIS_URI": "redis://redis:6379",
+              "APP_EMAIL_CLIENT__BASE_URL": "https://api.postmarkapp.com",
+              "APP_EMAIL_CLIENT__SENDER_EMAIL": os.environ["APP_EMAIL_CLIENT__SENDER_EMAIL"],
+              "APP_EMAIL_CLIENT__AUTHORIZATION_TOKEN": os.environ["APP_EMAIL_CLIENT__AUTHORIZATION_TOKEN"],
+              "APP_EMAIL_CLIENT__TIMEOUT_MILLISECONDS": "10000",
+              "RUST_LOG": "info",
+          }
+
+          missing = [name for name, value in values.items() if not value]
+          if missing:
+              raise SystemExit(f"Missing required GitHub Secrets: {', '.join(missing)}")
+
+          def dotenv_quote(value: str) -> str:
+              if "\n" in value or "\r" in value:
+                  raise SystemExit("Multiline values are not supported in the production .env")
+              return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+          contents = "".join(
+              f"{name}={dotenv_quote(value)}\n" for name, value in values.items()
+          )
+          path = Path("production.env")
+          path.write_text(contents)
+          path.chmod(0o600)
+          PY
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Upload release
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          SSH_PORT="${SSH_PORT:-22}"
+          test -n "$SSH_HOST"
+          test -n "$SSH_USER"
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "install -d -m 750 /opt/zero2prod/deploy"
+          scp -p -P "$SSH_PORT" \
+            zero2prod-image.tar.gz production.env compose.yaml \
+            "$SSH_USER@$SSH_HOST:/opt/zero2prod/"
+          scp -p -P "$SSH_PORT" deploy/Caddyfile deploy/deploy.sh \
+            "$SSH_USER@$SSH_HOST:/opt/zero2prod/deploy/"
+
+      - name: Activate release
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          SSH_PORT="${SSH_PORT:-22}"
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "chmod 750 /opt/zero2prod/deploy/deploy.sh && /opt/zero2prod/deploy/deploy.sh '$GITHUB_SHA'"
