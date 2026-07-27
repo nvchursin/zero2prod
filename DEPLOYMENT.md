@@ -1,8 +1,8 @@
 # Развёртывание на VPS
 
-Production временно разворачивается на `151-246-182-63.sslip.io` из GitHub
-Actions при каждом успешном push в `master`. Registry не используется:
-workflow собирает образ, передаёт его на VPS по SSH и запускает Docker Compose.
+Production разворачивается на `nickchursin.com` из GitHub Actions при каждом
+успешном push в `master`. Registry не используется: workflow собирает образ,
+передаёт его на VPS по SSH и запускает Docker Compose.
 
 Проверки форматирования, Clippy и тесты запускаются для pull request в
 `master`, а также после push в саму ветку `master`. Это исключает две
@@ -32,10 +32,9 @@ workflow собирает образ, передаёт его на VPS по SSH 
 
 ## 1. DNS и firewall
 
-Временный адрес `151-246-182-63.sslip.io` автоматически резолвится в
-`151.246.182.63`, поэтому отдельная DNS-запись для первого deploy не нужна.
-Когда DNS `nickchursin.com` обновится, верните домен в `deploy/Caddyfile`,
-замените `APP_APPLICATION__BASE_URL` в GitHub Secrets и выполните новый deploy.
+DNS-записи `nickchursin.com` и `www.nickchursin.com` должны указывать на
+`151.246.182.63`. Добавляйте `AAAA` только если IPv6 действительно настроен и
+доступен на VPS.
 
 Откройте SSH, HTTP и HTTPS. Например, для UFW:
 
@@ -73,7 +72,7 @@ sudo install -d -o webadmin -g webadmin -m 750 /opt/zero2prod
 | `SSH_USER`                              | `webadmin`                               |
 | `SSH_PRIVATE_KEY`                       | Приватный ключ без passphrase            |
 | `SSH_KNOWN_HOSTS`                       | Проверенная строка `known_hosts` для VPS |
-| `APP_APPLICATION__BASE_URL`             | `https://151-246-182-63.sslip.io`        |
+| `APP_APPLICATION__BASE_URL`             | `https://nickchursin.com`                |
 | `APP_APPLICATION__HMAC_SECRET`          | Длинный случайный ключ подписи           |
 | `APP_DATABASE__USERNAME`                | Например `zero2prod`                     |
 | `APP_DATABASE__PASSWORD`                | Длинный случайный пароль PostgreSQL      |
@@ -116,7 +115,7 @@ cd /opt/zero2prod
 export IMAGE_TAG="$(<.current-release)"
 docker compose --env-file .env ps
 docker compose --env-file .env logs -f app caddy
-curl --fail https://151-246-182-63.sslip.io/healthz
+curl --fail https://nickchursin.com/healthz
 ```
 
 Caddy получит сертификат только если DNS уже указывает на VPS и порты 80/443
