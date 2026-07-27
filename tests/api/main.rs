@@ -1,5 +1,6 @@
 mod admin_dashboard;
 mod change_password;
+mod frontend;
 mod health_check;
 mod helpers;
 mod login;

@@ -15,11 +15,11 @@ async fn an_error_flash_message_is_set_on_failure() {
 
     let html_page = app.get_login_html().await;
 
-    assert!(html_page.contains(r#"<p><i>Authentication failed</i></p>"#));
+    assert!(html_page.contains("Authentication failed"));
 
     let html_page = app.get_login_html().await;
 
-    assert!(!html_page.contains(r#"<p><i>Authentication failed</i></p>"#));
+    assert!(!html_page.contains("Authentication failed"));
 }
 
 #[tokio::test]
@@ -37,5 +37,6 @@ async fn redirect_to_admin_dashboard_after_login_success() {
 
     let html_page = app.get_admin_dashboard_html().await;
 
-    assert!(html_page.contains(&format!("Welcome {}", app.test_user.username)));
+    assert!(html_page.contains("Welcome"));
+    assert!(html_page.contains(&app.test_user.username));
 }

@@ -24,7 +24,8 @@ async fn logout_clears_session_state() {
 
     let html_page = app.get_admin_dashboard_html().await;
 
-    assert!(html_page.contains(&format!("Welcome {}", app.test_user.username)));
+    assert!(html_page.contains("Welcome"));
+    assert!(html_page.contains(&app.test_user.username));
 
     let response = app.post_logout().await;
 
@@ -32,7 +33,7 @@ async fn logout_clears_session_state() {
 
     let html_page = app.get_login_html().await;
 
-    assert!(html_page.contains(r#"<p><i>You have successfully logged out</i></p>"#));
+    assert!(html_page.contains("You have successfully logged out"));
 
     let response = app.get_admin_dashboard().await;
 

@@ -87,9 +87,9 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
 
     let html_page = app.get_newsletters_html().await;
 
-    assert!(html_page.contains(
-        "<p><i>The newsletter issue has been accepted - emails will go out shortly</i></p>"
-    ));
+    assert!(
+        html_page.contains("The newsletter issue has been accepted - emails will go out shortly")
+    );
 
     app.dispatch_all_pending_emails().await;
 }
@@ -124,9 +124,9 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
 
     let html_page = app.get_newsletters_html().await;
 
-    assert!(html_page.contains(
-        "<p><i>The newsletter issue has been accepted - emails will go out shortly</i></p>"
-    ));
+    assert!(
+        html_page.contains("The newsletter issue has been accepted - emails will go out shortly")
+    );
 
     app.dispatch_all_pending_emails().await;
 }
@@ -215,18 +215,18 @@ async fn newsletter_creation_is_idempotent() {
 
     let html_page = app.get_newsletters_html().await;
 
-    assert!(html_page.contains(
-        "<p><i>The newsletter issue has been accepted - emails will go out shortly</i></p>"
-    ));
+    assert!(
+        html_page.contains("The newsletter issue has been accepted - emails will go out shortly")
+    );
 
     let response = app.post_newsletters(&newsletter_body).await;
     assert_is_redirect_to(&response, "/admin/newsletters");
 
     let html_page = app.get_newsletters_html().await;
 
-    assert!(html_page.contains(
-        "<p><i>The newsletter issue has been accepted - emails will go out shortly</i></p>"
-    ));
+    assert!(
+        html_page.contains("The newsletter issue has been accepted - emails will go out shortly")
+    );
 
     app.dispatch_all_pending_emails().await;
 }

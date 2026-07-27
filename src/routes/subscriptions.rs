@@ -5,6 +5,7 @@ use serde::Deserialize;
 use sqlx::{PgPool, Postgres, Transaction};
 use tracing::instrument;
 use uuid::Uuid;
+use zero2prod_frontend::PageData;
 
 use crate::{
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
@@ -232,5 +233,5 @@ pub async fn subscribe(
         anyhow::Error::new(err).context("Failed to send a confirmation email")
     })?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(super::render::page(PageData::SubscriptionPending))
 }
