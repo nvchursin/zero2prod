@@ -1,8 +1,7 @@
-use actix_web::{HttpResponse, get, http::header::ContentType};
+use actix_web::{HttpResponse, get};
+use zero2prod_frontend::PageData;
 
 #[get("/")]
 async fn index() -> HttpResponse {
-    HttpResponse::Ok()
-        .content_type(ContentType::html())
-        .body(include_str!("home.html"))
+    super::render::page(PageData::Home)
 }

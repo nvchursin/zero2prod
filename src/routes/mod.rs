@@ -2,6 +2,7 @@ mod admin;
 mod health;
 mod home;
 pub mod login;
+mod render;
 mod subscriptions;
 mod subscriptions_confirm;
 

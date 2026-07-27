@@ -2,6 +2,7 @@ use actix_web::{HttpResponse, get, web};
 use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
+use zero2prod_frontend::PageData;
 
 #[derive(serde::Deserialize)]
 pub struct Parameters {
@@ -61,7 +62,7 @@ pub async fn confirm(parameters: web::Query<Parameters>, pool: web::Data<PgPool>
                 return HttpResponse::InternalServerError().finish();
             }
 
-            HttpResponse::Ok().finish()
+            super::render::page(PageData::Confirmation)
         }
     }
 }

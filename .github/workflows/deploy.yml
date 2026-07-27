@@ -56,9 +56,13 @@ jobs:
         uses: dtolnay/rust-toolchain@1.97.0
         with:
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+
+      - name: Install Cargo Leptos
+        run: cargo install cargo-leptos --version 0.3.7 --locked
 
       - name: Apply CI database migrations
         run: |
@@ -69,13 +73,23 @@ jobs:
             sh -c 'for migration in /migrations/*.sql; do psql --host 127.0.0.1 --username postgres --dbname newsletter --set ON_ERROR_STOP=1 --file "$migration"; done'
 
       - name: Check formatting
-        run: cargo fmt --check
+        run: cargo fmt --all --check
 
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Run server Clippy
+        run: cargo clippy --workspace --all-targets --exclude zero2prod-frontend -- -D warnings
+
+      - name: Run frontend Clippy
+        run: |
+          cargo clippy -p zero2prod-frontend --features ssr -- -D warnings
+          cargo clippy -p zero2prod-frontend --target wasm32-unknown-unknown --no-default-features --features hydrate -- -D warnings
 
       - name: Run tests
-        run: cargo test --all-targets --all-features
+        run: cargo test --workspace --exclude zero2prod-frontend --all-targets
+
+      - name: Build production frontend
+        env:
+          SQLX_OFFLINE: true
+        run: cargo leptos build --release
 
   deploy:
     name: Build and deploy

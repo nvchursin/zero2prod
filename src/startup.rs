@@ -1,5 +1,6 @@
 use std::{net::TcpListener, time::Duration};
 
+use actix_files::Files;
 use actix_session::{SessionMiddleware, storage::RedisSessionStore};
 use actix_web::{App, HttpServer, cookie::Key, dev::Server, middleware::from_fn, services, web};
 use actix_web_flash_messages::{FlashMessagesFramework, storage::CookieMessageStore};
@@ -49,6 +50,7 @@ pub async fn run(
     let message_store = CookieMessageStore::builder(secret_key.clone()).build();
     let message_framework = FlashMessagesFramework::builder(message_store).build();
     let redis_store = RedisSessionStore::new(redis_uri).await?;
+    let site_root = std::env::var("LEPTOS_SITE_ROOT").unwrap_or_else(|_| "target/site".to_owned());
 
     let server = HttpServer::new(move || {
         App::new()
@@ -78,6 +80,8 @@ pub async fn run(
                 subscribe,
                 confirm,
             ])
+            .service(Files::new("/pkg", format!("{}/pkg", site_root.as_str())))
+            .service(Files::new("/assets", site_root.as_str()))
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())
