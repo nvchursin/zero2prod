@@ -1,7 +1,7 @@
 FROM rust:1.97.0-slim-bookworm AS builder
 WORKDIR /app
 RUN apt-get update -y \
-    && apt-get install -y --no-install-recommends clang curl pkg-config \
+    && apt-get install -y --no-install-recommends build-essential clang curl perl pkg-config \
     && rm -rf /var/lib/apt/lists/* \
     && rustup target add wasm32-unknown-unknown \
     && cargo install cargo-leptos --version 0.3.7 --locked
